@@ -175,7 +175,7 @@ def main():
 
         # Compute the per-donor engraftment fraction
         sgb_fraction_df['engraftment_fraction'] = sgb_fraction_df['count'] / sgb_fraction_df['total_samples']
-
+        
         # --- Compute GLOBAL denominator engraftment fraction ---
         total_fmt_samples = engraftment_df['donor_sample_name'].notna().sum()
         print(f"\nTotal FMT samples at {timepoint_of_interest} (excluding placebo): {total_fmt_samples}")
@@ -184,6 +184,11 @@ def main():
         sgb_fraction_global_df['engraftment_fraction_global'] = (
             sgb_fraction_global_df['count'] / total_fmt_samples
         )
+        
+        # Export global engraftment fractions CSV:
+        output_filename = f"engraftment_frequencies_{timepoint_of_interest}.csv"
+        sgb_fraction_global_df.to_csv(output_filename, index=False)
+        print(f"\nEngraftment frequency table with global denominator exported to {output_filename}")
 
         # Get top 10 SGBs per donor using global denominator
         top_global_fraction_sgbs = (
