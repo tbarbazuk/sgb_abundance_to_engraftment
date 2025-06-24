@@ -1,6 +1,4 @@
-# Ignore all CSV and TSV files
+# Ignore all CSV, TSV, and PNG files
 *.csv
 *.tsv
-
-# Optional: whitelist specific files if needed
-# !keep_this_file.tsv
+*.png
