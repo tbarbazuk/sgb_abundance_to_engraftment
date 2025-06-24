@@ -22,10 +22,8 @@ This repository provides a suite of Python tools to analyze **Species Genome Bin
 
 | Script Name                       | Description                                                                                           |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `sgb_engraftment.py`              | Core logic for calculating engrafted SGB counts and fractions, and matching strains to donor profiles |
-| `engraftment_vs_abundance.py`     | Correlates SGB engraftment frequency with MetaPhlAn taxonomic abundance                               |
-| `filter_metadata_by_timepoint.py` | Utility to filter sample metadata for a specified timepoint (`t7`, `t30`, etc.)                       |
-| `common.py` *(optional)*          | (Recommended) Shared utility functions like strain parsing, sample ID logic, etc. (if modularized)    |
+| `engraftment_counter.py`          | Core logic for calculating engrafted SGB counts and fractions, and matching strains to donor profiles |
+| `relative_abundance_to_engraft.py`| Correlates SGB engraftment frequency with MetaPhlAn taxonomic abundance                               |
 
 ---
 
