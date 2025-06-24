@@ -136,109 +136,56 @@ def main():
         # Step 2: Create mapping and get stats
         sample_to_donor_map, missing_count, missing_fraction = get_sample_to_donor_map(filtered_metadata)
         
-        # Step 3: Get matched samples
+        # Step 3: Get matched samples (samples with donor info)
         matched_df, matched_map = get_matched_samples(filtered_metadata)
 
-        # Step 4: Load engraftment data
+        # Step 4: Load engraftment data filtered by timepoint
         engraftment_df = load_engraftment_data(engraftment_path, timepoint_filter=engraftment_timepoint)
 
-        # Step 5: Add donor_sample_name to engraftment data
+        # Step 5: Add donor_sample_name to engraftment data by merging on subject_id
         matched_df['subject_id'] = matched_df['sample_id'].str.extract(r'FMT_(T\d{3})')
         subject_to_donor_df = matched_df[['subject_id', 'donor_sample_name']].drop_duplicates()
         engraftment_df = engraftment_df.reset_index()
         engraftment_df = pd.merge(engraftment_df, subject_to_donor_df, on='subject_id', how='left')
-        # Step 5 continued: Remove donors starting with 'DT005'
+
+        # Remove donors starting with 'DTT005' (if needed)
         engraftment_df = engraftment_df[~engraftment_df['donor_sample_name'].str.startswith("DTT005", na=False)]
 
         unmatched = engraftment_df['donor_sample_name'].isna().sum()
         print(f"\nDonor assignment complete. Unmatched entries: {unmatched}")
 
-        # Step 6: Match strains from donor and recipient
+        # Step 6: Find matched strains between donor and recipient
         engraftment_df = find_strain_matches(engraftment_df)
 
-        # Step 7: Count engrafted SGBs per donor
-        sgb_count_df = count_engrafted_sgbs(engraftment_df)
-        
-        # Count total recipient samples per donor at this timepoint
-        samples_per_donor = (
-            engraftment_df
-            .groupby('donor_sample_name')['sample_id']
-            .nunique()
-            .reset_index(name='total_samples')
-        )
-
-        print("\nSamples per donor (used as denominator for per-donor engraftment fraction):")
-        print(samples_per_donor)
-
-        # Merge with the SGB counts
-        sgb_fraction_df = pd.merge(sgb_count_df, samples_per_donor, on='donor_sample_name', how='left')
-
-        # Compute the per-donor engraftment fraction
-        sgb_fraction_df['engraftment_fraction'] = sgb_fraction_df['count'] / sgb_fraction_df['total_samples']
-        
-        # --- Compute GLOBAL denominator engraftment fraction ---
+        # Step 7: Compute total FMT samples (exclude missing donors)
         total_fmt_samples = engraftment_df['donor_sample_name'].notna().sum()
         print(f"\nTotal FMT samples at {timepoint_of_interest} (excluding placebo): {total_fmt_samples}")
 
-        sgb_fraction_global_df = sgb_count_df.copy()
-        sgb_fraction_global_df['engraftment_fraction_global'] = (
-            sgb_fraction_global_df['count'] / total_fmt_samples
+        # Step 8: Count SGB occurrences globally (across all donors)
+        sgb_global_counts = (
+            engraftment_df.explode('matched_strains')
+            .dropna(subset=['matched_strains'])
+            .groupby('matched_strains')
+            .size()
+            .reset_index(name='count')
+            .rename(columns={'matched_strains': 'sgb_id'})
         )
+
+        # Step 9: Calculate global engraftment fraction
+        sgb_global_counts['engraftment_fraction_global'] = sgb_global_counts['count'] / total_fmt_samples
         
-        # Export global engraftment fractions CSV:
+        # Step 10: Export results
         output_filename = f"engraftment_frequencies_{timepoint_of_interest}.csv"
-        sgb_fraction_global_df.to_csv(output_filename, index=False)
-        print(f"\nEngraftment frequency table with global denominator exported to {output_filename}")
+        sgb_global_counts.to_csv(output_filename, index=False)
+        print(f"\nEngraftment frequency table exported to {output_filename}")
 
-        # Get top 10 SGBs per donor using global denominator
-        top_global_fraction_sgbs = (
-            sgb_fraction_global_df
-            .sort_values(['donor_sample_name', 'engraftment_fraction_global'], ascending=[True, False])
-            .groupby('donor_sample_name')
-            .head(10)
-        )
+        # Step 11: Print top 10 SGBs by global engraftment fraction
+        top_global_fraction_sgbs = sgb_global_counts.sort_values(
+            'engraftment_fraction_global', ascending=False
+        ).head(10)
 
-        # Sort for readability
-        sgb_fraction_df = sgb_fraction_df.sort_values(['donor_sample_name', 'engraftment_fraction'], ascending=[True, False])
-
-        # Step 8: Display top 10 SGBs per donor
-        top_sgbs = (
-            sgb_count_df
-            .sort_values(['donor_sample_name', 'count'], ascending=[True, False])
-            .groupby('donor_sample_name')
-            .head(10)
-        )
-        
-        # Step 9: Display top 10 SGBs per donor by engraftment fraction
-        top_fraction_sgbs = (
-            sgb_fraction_df
-            .sort_values(['donor_sample_name', 'engraftment_fraction'], ascending=[True, False])  # <-- required
-            .groupby('donor_sample_name')
-            .head(10)
-        )
-        
-        print("Sample to donor map")
-        print(sample_to_donor_map)
-        
-        print("\n--- Total recipient samples per donor (from sample_to_donor_map) ---")
-        print(samples_per_donor.sort_values('total_samples', ascending=False))
-        
-        print("\n--- Engraftment DataFrame (after donor matching) ---")
-        print(engraftment_df[['sample_id', 'subject_id', 'donor_sample_name', 'eng_strains', 'total_donor_strains']].head(5))
-
-        print("\n--- Full SGB count DataFrame ---")
-        print(sgb_count_df.head(10)) 
-
-        print("\n--- Raw types and contents of eng_strains and total_donor_strains ---")
-        print(engraftment_df[['eng_strains', 'total_donor_strains']].head(3))
-        print("\nTypes:")
-        print(type(engraftment_df['eng_strains'].iloc[0]), type(engraftment_df['total_donor_strains'].iloc[0]))
-
-        print("\nTop SGBs by engraftment fraction per donor:")
-        print(top_fraction_sgbs[['donor_sample_name', 'sgb_id', 'count', 'total_samples', 'engraftment_fraction']])
-
-        print("\nSGBs by engraftment fraction across all donor samples (GLOBAL denominator):")
-        print(top_global_fraction_sgbs[['donor_sample_name', 'sgb_id', 'count', 'engraftment_fraction_global']])
+        print("\nTop 10 SGBs by global engraftment fraction:")
+        print(top_global_fraction_sgbs)
 
     except FileNotFoundError as e:
         print(f"Error: File not found - {e}")
