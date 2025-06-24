@@ -38,6 +38,19 @@ def main(engraftment_csv, metaphlan_tsv, donor_sample, output_csv):
 
     print("MetaPhlAn SGB numeric IDs preview:")
     print(donor_abundance_df[['sgb_id', 'sgb_num']].head(10))
+    
+    # Identify top 10 most abundant SGBs in the donor sample
+    top10_df = donor_abundance_df.sort_values(by="relative_abundance", ascending=False).head(10)
+
+    # Merge with engraftment data to check if any engrafted
+    top10_with_engraftment = pd.merge(top10_df, engraftment_df, on="sgb_num", how="left")
+    top10_with_engraftment["engraftment_fraction_global"] = top10_with_engraftment["engraftment_fraction_global"].fillna(0)
+
+    # Save to CSV
+    top10_output_csv = output_csv.replace(".csv", "_top10_donor_sgbs.csv")
+    top10_with_engraftment.drop(columns=["sgb_num"]).to_csv(top10_output_csv, index=False)
+
+    print(f"Top 10 abundant donor SGBs saved to {top10_output_csv}")
 
     # 1. Engrafted only (inner join)
     matched_df = pd.merge(engraftment_df, donor_abundance_df, on='sgb_num', how='inner')
