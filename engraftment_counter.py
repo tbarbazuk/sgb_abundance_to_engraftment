@@ -110,6 +110,12 @@ Examples:
         help='Path to the engraftment CSV file'
     )
     
+    parser.add_argument(
+        '--prefix',
+        default='FMT_',
+        help='Prefix to add to donor names in output file (default: FMT_)'
+    )
+    
     return parser.parse_args()
 
 def main():
@@ -119,6 +125,7 @@ def main():
     timepoint_of_interest = args.timepoint
     metadata_path = args.metadata_file
     engraftment_path = args.engraftment_file
+    prefix = args.prefix
     
     # Convert timepoint for engraftment data (add .0 if not present)
     engraftment_timepoint = f"{timepoint_of_interest}.0" if not timepoint_of_interest.endswith('.0') else timepoint_of_interest
@@ -127,6 +134,7 @@ def main():
     print(f"Metadata file: {metadata_path}")
     print(f"Engraftment file: {engraftment_path}")
     print(f"Engraftment timepoint filter: {engraftment_timepoint}")
+    print(f"Prefix for donor names: '{prefix}'")
     print("-" * 50)
 
     try:
@@ -135,10 +143,13 @@ def main():
 
         # Step 2: Create mapping and get stats
         sample_to_donor_map, missing_count, missing_fraction = get_sample_to_donor_map(filtered_metadata)
+        print("sample_to_donor_map")
+        print(sample_to_donor_map)        
         
         # Step 3: Get matched samples (samples with donor info)
         matched_df, matched_map = get_matched_samples(filtered_metadata)
-
+        print(matched_map)
+        
         # Step 4: Load engraftment data filtered by timepoint
         engraftment_df = load_engraftment_data(engraftment_path, timepoint_filter=engraftment_timepoint)
 
@@ -148,20 +159,40 @@ def main():
         engraftment_df = engraftment_df.reset_index()
         engraftment_df = pd.merge(engraftment_df, subject_to_donor_df, on='subject_id', how='left')
 
-        # Remove donors starting with 'DTT005' (if needed)
+        # Step 6: Remove donors starting with 'DTT005' (FILTERING STEP)
+        print(f"\nBefore DTT005 filtering: {len(engraftment_df)} samples")
         engraftment_df = engraftment_df[~engraftment_df['donor_sample_name'].str.startswith("DTT005", na=False)]
+        print(f"After DTT005 filtering: {len(engraftment_df)} samples")
+
+        # Step 7: Generate donor text files AFTER filtering with prefix
+        remaining_donors = engraftment_df['donor_sample_name'].dropna().unique()
+        donor_output_file = f"donors_remaining_{timepoint_of_interest}.txt"
+        
+        print(f"\nFinal remaining donors after DTT005 filtering: {len(remaining_donors)}")
+        print(f"Donor list (original): {sorted(remaining_donors)}")
+        
+        # Write donors with prefix to the text file
+        with open(donor_output_file, 'w') as f:
+            for donor in sorted(remaining_donors):
+                prefixed_donor = f"{prefix}{donor}"
+                f.write(f"{prefixed_donor}\n")
+        
+        # Show what was written to file
+        prefixed_donors = [f"{prefix}{donor}" for donor in sorted(remaining_donors)]
+        print(f"Donor list (with prefix '{prefix}'): {prefixed_donors}")
+        print(f"Remaining donor sample names (with prefix) written to {donor_output_file}")
 
         unmatched = engraftment_df['donor_sample_name'].isna().sum()
-        print(f"\nDonor assignment complete. Unmatched entries: {unmatched}")
+        print(f"Donor assignment complete. Unmatched entries: {unmatched}")
 
-        # Step 6: Find matched strains between donor and recipient
+        # Step 8: Find matched strains between donor and recipient
         engraftment_df = find_strain_matches(engraftment_df)
 
-        # Step 7: Compute total FMT samples (exclude missing donors)
+        # Step 9: Compute total FMT samples (exclude missing donors)
         total_fmt_samples = engraftment_df['donor_sample_name'].notna().sum()
-        print(f"\nTotal FMT samples at {timepoint_of_interest} (excluding placebo): {total_fmt_samples}")
+        print(f"\nTotal FMT samples at {timepoint_of_interest} (excluding placebo and DTT005): {total_fmt_samples}")
 
-        # Step 8: Count SGB occurrences globally (across all donors)
+        # Step 10: Count SGB occurrences globally (across all donors)
         sgb_global_counts = (
             engraftment_df.explode('matched_strains')
             .dropna(subset=['matched_strains'])
@@ -171,15 +202,15 @@ def main():
             .rename(columns={'matched_strains': 'sgb_id'})
         )
 
-        # Step 9: Calculate global engraftment fraction
+        # Step 11: Calculate global engraftment fraction
         sgb_global_counts['engraftment_fraction_global'] = sgb_global_counts['count'] / total_fmt_samples
         
-        # Step 10: Export results
+        # Step 12: Export results
         output_filename = f"engraftment_frequencies_{timepoint_of_interest}.csv"
         sgb_global_counts.to_csv(output_filename, index=False)
         print(f"\nEngraftment frequency table exported to {output_filename}")
 
-        # Step 11: Print top 10 SGBs by global engraftment fraction
+        # Step 13: Print top 10 SGBs by global engraftment fraction
         top_global_fraction_sgbs = sgb_global_counts.sort_values(
             'engraftment_fraction_global', ascending=False
         ).head(10)
