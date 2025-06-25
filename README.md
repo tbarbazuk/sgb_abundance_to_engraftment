@@ -1,4 +1,4 @@
-# 🧬 SGB Engraftment Analysis
+# 🧬 SGB Abundance to Engraftment Analysis
 
 This repository provides a suite of Python tools to analyze **Species Genome Bin (SGB) engraftment** in recipients following **Fecal Microbiota Transplantation (FMT)**. It includes utilities for parsing sample metadata, identifying engrafted strains, and correlating engraftment patterns with taxonomic profiles from **MetaPhlAn**.
 
