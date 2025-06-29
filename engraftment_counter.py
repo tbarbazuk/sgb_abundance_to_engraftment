@@ -341,19 +341,21 @@ def main():
             .dropna(subset=['matched_strains'])
             .groupby('matched_strains')
             .size()
-            .reset_index(name='count')
+            .reset_index(name='engraftment_count')
             .rename(columns={'matched_strains': 'sgb_id'})
         )
 
-        # Step 11: Calculate global engraftment fraction
-        sgb_global_counts['engraftment_fraction_global'] = sgb_global_counts['count'] / total_fmt_samples
+        # Step 11: Calculate global engraftment fraction - FIXED COLUMN NAMES
+        sgb_global_counts['total_samples'] = total_fmt_samples
+        sgb_global_counts['engraftment_frequency'] = sgb_global_counts['engraftment_count'] / total_fmt_samples
+        sgb_global_counts['engraftment_percentage'] = sgb_global_counts['engraftment_frequency'] * 100
         
         # Step 12: Export results
         output_filename = f"engraftment_frequencies_{timepoint_of_interest}.csv"
         sgb_global_counts.to_csv(output_filename, index=False)
         print(f"\nEngraftment frequency table exported to {output_filename}")
         
-        # Step 12.5: Generate per-donor engraftment CSVs (keeping original functionality)
+        # Step 12.5: Generate per-donor engraftment CSVs - FIXED COLUMN NAMES
         donor_sample_groups = engraftment_df.groupby('donor_sample_name')
         donor_csv_output_dir = f"donor_stats_{timepoint_of_interest}"
         os.makedirs(donor_csv_output_dir, exist_ok=True)
@@ -365,10 +367,13 @@ def main():
                 .dropna(subset=['matched_strains'])
                 .groupby('matched_strains')
                 .size()
-                .reset_index(name='count')
+                .reset_index(name='engraftment_count')
                 .rename(columns={'matched_strains': 'sgb_id'})
             )
-            donor_strains['engraftment_fraction'] = donor_strains['count'] / donor_sample_count
+            # FIXED: Use consistent column names
+            donor_strains['total_samples'] = donor_sample_count
+            donor_strains['engraftment_frequency'] = donor_strains['engraftment_count'] / donor_sample_count
+            donor_strains['engraftment_percentage'] = donor_strains['engraftment_frequency'] * 100
 
             donor_filename = f"{donor_csv_output_dir}/engraftment_{donor_name}_{timepoint_of_interest}.csv"
             donor_strains.to_csv(donor_filename, index=False)
@@ -376,10 +381,10 @@ def main():
 
         # Step 13: Print top 10 SGBs by global engraftment fraction
         top_global_fraction_sgbs = sgb_global_counts.sort_values(
-            'engraftment_fraction_global', ascending=False
+            'engraftment_frequency', ascending=False
         ).head(10)
 
-        print("\nTop 10 SGBs by global engraftment fraction:")
+        print("\nTop 10 SGBs by global engraftment frequency:")
         print(top_global_fraction_sgbs)
 
         # Step 14: Print summary of all outputs
@@ -390,7 +395,7 @@ def main():
         print(f"2. Donor list: {donor_output_file}")
         print(f"3. Basic donor CSVs: {donor_dir}/")
         print(f"4. Donor stats: {donor_csv_output_dir}/")
-        print(f"5. COMPREHENSIVE donor analysis: {comprehensive_dir}/")
+        print(f"5. COMPREHENSIVE donor analysis: ./")
         print(f"   - Includes summary statistics, strain frequencies, and sample details")
         print(f"   - Each donor has 4 files: comprehensive, summary, strain frequencies, and sample details")
 

@@ -23,6 +23,9 @@ def main(engraftment_csv, metaphlan_tsv, sample_list_file, output_csv):
     # Load engraftment CSV
     engraftment_df = pd.read_csv(engraftment_csv)
     engraftment_df['sgb_num'] = engraftment_df['sgb_id'].apply(extract_sgb_number)
+    
+    # Print columns to debug
+    print(f"Engraftment CSV columns: {list(engraftment_df.columns)}")
 
     # Load MetaPhlAn TSV - read header rows to get sample names
     print("Reading MetaPhlAn file header...")
@@ -113,7 +116,8 @@ def main(engraftment_csv, metaphlan_tsv, sample_list_file, output_csv):
 
     # Merge top 10 with engraftment data
     top10_with_engraftment = pd.merge(top10_df, engraftment_df, on="sgb_num", how="left")
-    top10_with_engraftment["engraftment_fraction_global"] = top10_with_engraftment["engraftment_fraction_global"].fillna(0)
+    # FIXED: Use correct column name
+    top10_with_engraftment["engraftment_frequency"] = top10_with_engraftment["engraftment_frequency"].fillna(0)
 
     # Save top 10
     top10_output_csv = output_csv.replace(".csv", "_top10_target_sgbs.csv")
@@ -122,7 +126,7 @@ def main(engraftment_csv, metaphlan_tsv, sample_list_file, output_csv):
 
     # CRITICAL ANALYSIS: SGBs with zero sample abundance but engraftment
     zero_abundance_engrafted = pd.merge(
-        engraftment_df[engraftment_df['engraftment_fraction_global'] > 0], 
+        engraftment_df[engraftment_df['engraftment_frequency'] > 0], 
         sample_abundance_df, 
         on='sgb_num', 
         how='left'
@@ -135,7 +139,7 @@ def main(engraftment_csv, metaphlan_tsv, sample_list_file, output_csv):
         for _, row in mysterious_sgbs.head(10).iterrows():
             # Use sgb_id from engraftment data, not sample data (which is missing)
             sgb_display = row['sgb_id_x'] if 'sgb_id_x' in row else f"SGB_{row['sgb_num']}"
-            print(f"   • {sgb_display}: engraftment = {row['engraftment_fraction_global']:.4f}")
+            print(f"   • {sgb_display}: engraftment = {row['engraftment_frequency']:.4f}")
         if len(mysterious_sgbs) > 10:
             print(f"   ... and {len(mysterious_sgbs) - 10} more")
         
@@ -152,14 +156,14 @@ def main(engraftment_csv, metaphlan_tsv, sample_list_file, output_csv):
         very_low_abundance = sample_abundance_df[sample_abundance_df['relative_abundance'] < 1e-5]  # < 0.001%
         if not very_low_abundance.empty:
             low_ab_high_eng = pd.merge(very_low_abundance, engraftment_df, on='sgb_num', how='inner')
-            high_engraftment = low_ab_high_eng[low_ab_high_eng['engraftment_fraction_global'] > 0.1]  # > 10% engraftment
+            high_engraftment = low_ab_high_eng[low_ab_high_eng['engraftment_frequency'] > 0.1]  # > 10% engraftment
             
             if not high_engraftment.empty:
                 print(f"\nINTERESTING: {len(high_engraftment)} SGBs with very low sample abundance (<0.001%) but high engraftment (>10%):")
                 for _, row in high_engraftment.head(5).iterrows():
                     # Handle potential column name conflicts from merge
                     sgb_display = row.get('sgb_id_x', row.get('sgb_id_y', row.get('sgb_id', f"SGB_{row['sgb_num']}")))
-                    print(f"   • {sgb_display}: abundance = {row['relative_abundance']:.2e}, engraftment = {row['engraftment_fraction_global']:.3f}")
+                    print(f"   • {sgb_display}: abundance = {row['relative_abundance']:.2e}, engraftment = {row['engraftment_frequency']:.3f}")
                 
                 # Save for further investigation
                 outlier_output = output_csv.replace(".csv", "_low_abundance_high_engraftment.csv")
@@ -172,7 +176,7 @@ def main(engraftment_csv, metaphlan_tsv, sample_list_file, output_csv):
     print(f"\nMatched SGBs (present in both datasets): {len(matched_df)}")
     
     if len(matched_df) > 1:
-        spearman_res = spearmanr(matched_df['engraftment_fraction_global'], matched_df['relative_abundance'])
+        spearman_res = spearmanr(matched_df['engraftment_frequency'], matched_df['relative_abundance'])
         print(f"Spearman correlation: r = {spearman_res.correlation:.3f}, p = {spearman_res.pvalue:.3e}")
     else:
         print("Too few matched SGBs for correlation analysis")
@@ -183,7 +187,7 @@ def main(engraftment_csv, metaphlan_tsv, sample_list_file, output_csv):
 
     # Merge all sample SGBs with engraftment data (fill 0 for missing)
     all_df = pd.merge(sample_abundance_df, engraftment_df, on='sgb_num', how='left')
-    all_df['engraftment_fraction_global'] = all_df['engraftment_fraction_global'].fillna(0)
+    all_df['engraftment_frequency'] = all_df['engraftment_frequency'].fillna(0)
     all_df.drop(columns=['sgb_num'], inplace=True)
 
     # Save full merged output
