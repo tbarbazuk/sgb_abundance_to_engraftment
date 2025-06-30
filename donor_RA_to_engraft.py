@@ -3,6 +3,15 @@ import pandas as pd
 import re
 from scipy.stats import spearmanr
 
+"Example Usage:
+python relative_abundance_to_engraft.py \
+  --engraftment_csv engraftment_frequencies_t7.csv \
+  --metaphlan_tsv metaphlan_profiles_sgb.tsv \
+  --sample_list donors_remaining_t7.txt \
+  --output_csv all_donors_t7_engraft.csv
+"
+
+
 def extract_sgb_number(s):
     """Extract digits from an SGB string, return as string."""
     match = re.search(r'(\d+)', str(s))

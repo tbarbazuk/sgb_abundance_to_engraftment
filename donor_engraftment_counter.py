@@ -4,6 +4,9 @@ import argparse
 import sys
 import os
 
+"Exmple usage:
+python engraftment_counter.py t7 metadata.tsv engraftment_data.csv"
+
 def filter_by_timepoint(metadata_csv, timepoint='t7'):
     df = pd.read_csv(metadata_csv, sep='\t')
     filtered_df = df[df['timepoint'] == timepoint].copy()
